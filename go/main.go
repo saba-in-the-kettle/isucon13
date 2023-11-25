@@ -257,6 +257,8 @@ func main() {
 
 	e.HTTPErrorHandler = errorResponseHandler
 
+	e.JSONSerializer = &isuutil.EchoJSONSerializer{}
+
 	echov4.EnableDebugHandler(e)
 
 	// DB接続
