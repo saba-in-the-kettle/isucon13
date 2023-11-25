@@ -230,13 +230,9 @@ func searchLivestreamsHandler(c echo.Context) error {
 		}
 	}
 
-	livestreams := make([]Livestream, len(livestreamModels))
-	for i := range livestreamModels {
-		livestream, err := fillLivestreamResponse(ctx, tx, *livestreamModels[i])
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestream: "+err.Error())
-		}
-		livestreams[i] = livestream
+	livestreams, err := fillLivestreamsResponse(ctx, tx, livestreamModels)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestreams: "+err.Error())
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -523,4 +519,78 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 		EndAt:        livestreamModel.EndAt,
 	}
 	return livestream, nil
+}
+
+type LivestreamTagAndTagName struct {
+	LivestreamTagModel
+	Name string `db:"name"`
+}
+
+func fillLivestreamsResponse(ctx context.Context, tx *sqlx.Tx, livestreamModels []*LivestreamModel) ([]Livestream, error) {
+	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "fillLivestreamsResponse")
+	defer span.End()
+
+	if len(livestreamModels) == 0 {
+		return []Livestream{}, nil
+	}
+
+	var userIDs []int64
+	var livestreamIDs []int64
+	for _, livestreamModel := range livestreamModels {
+		userIDs = append(userIDs, livestreamModel.UserID)
+		livestreamIDs = append(livestreamIDs, livestreamModel.ID)
+	}
+
+	owners, err := fillUsersResponse(ctx, tx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	ownersMap := map[int64]User{}
+	for _, owner := range owners {
+		ownersMap[owner.ID] = owner
+	}
+
+	q, args, err := sqlx.In("SELECT lt.*,t.name FROM livestream_tags as lt LEFT OUTER JOIN tags t on lt.tag_id = t.id WHERE lt.livestream_id IN (?)", livestreamIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var livestreamTagAndTagNames []LivestreamTagAndTagName
+	if err := tx.SelectContext(ctx, &livestreamTagAndTagNames, q, args...); err != nil {
+		return nil, err
+	}
+
+	liveStreamTagMapByLivestreamID := map[int64][]Tag{}
+	for _, livestreamTagModel := range livestreamTagAndTagNames {
+		liveStreamTagMapByLivestreamID[livestreamTagModel.LivestreamID] = append(liveStreamTagMapByLivestreamID[livestreamTagModel.LivestreamID], Tag{
+			ID:   livestreamTagModel.TagID,
+			Name: livestreamTagModel.Name,
+		})
+	}
+
+	livestreams := make([]Livestream, len(livestreamModels))
+	for i, livestreamModel := range livestreamModels {
+		owner, ok := ownersMap[livestreamModel.UserID]
+		if !ok {
+			return nil, sql.ErrNoRows
+		}
+		tags, ok := liveStreamTagMapByLivestreamID[livestreamModel.ID]
+		if !ok {
+			tags = []Tag{}
+		}
+
+		livestreams[i] = Livestream{
+			ID:           livestreamModel.ID,
+			Owner:        owner,
+			Title:        livestreamModel.Title,
+			Tags:         tags,
+			Description:  livestreamModel.Description,
+			PlaylistUrl:  livestreamModel.PlaylistUrl,
+			ThumbnailUrl: livestreamModel.ThumbnailUrl,
+			StartAt:      livestreamModel.StartAt,
+			EndAt:        livestreamModel.EndAt,
+		}
+	}
+
+	return livestreams, nil
 }

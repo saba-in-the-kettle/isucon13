@@ -430,3 +430,49 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 
 	return user, nil
 }
+
+type UserAndIconAndTheme struct {
+	UserModel
+	// Theme
+	ID       int64  `db:"theme_id"`
+	DarkMode bool   `db:"dark_mode"`
+	Image    []byte `db:"image"`
+}
+
+func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]User, error) {
+
+	var userAndIconAndThemes []UserAndIconAndTheme
+	q, args, err := sqlx.In("SELECT users.*, themes.id AS theme_id, themes.dark_mode, icons.image FROM users LEFT JOIN themes ON users.id = themes.user_id LEFT JOIN icons ON users.id = icons.user_id WHERE users.id IN (?)", userIDs)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.SelectContext(ctx, &userAndIconAndThemes, q, args...); err != nil {
+		return nil, err
+	}
+
+	users := make([]User, len(userAndIconAndThemes))
+
+	for i, userAndIconAndTheme := range userAndIconAndThemes {
+		if userAndIconAndTheme.Image == nil {
+			userAndIconAndTheme.Image, err = os.ReadFile(fallbackImage)
+			if err != nil {
+				return nil, err
+			}
+		}
+		iconHash := sha256.Sum256(userAndIconAndTheme.Image)
+
+		users[i] = User{
+			ID:          userAndIconAndTheme.ID,
+			Name:        userAndIconAndTheme.Name,
+			DisplayName: userAndIconAndTheme.DisplayName,
+			Description: userAndIconAndTheme.Description,
+			Theme: Theme{
+				ID:       userAndIconAndTheme.ID,
+				DarkMode: userAndIconAndTheme.DarkMode,
+			},
+			IconHash: fmt.Sprintf("%x", iconHash),
+		}
+	}
+
+	return users, nil
+}
