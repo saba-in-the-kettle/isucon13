@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -463,15 +464,18 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 type UserAndIconAndTheme struct {
 	UserModel
 	// Theme
-	ID        int64          `db:"theme_id"`
+	ThemeID   int64          `db:"theme_id"`
 	DarkMode  bool           `db:"dark_mode"`
 	ImageHash sql.NullString `db:"image_hash"`
 }
 
 func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]User, error) {
 
+	slices.Sort(userIDs)
+	uniqUserIDs := slices.Compact(userIDs)
+
 	var userAndIconAndThemes []UserAndIconAndTheme
-	q, args, err := sqlx.In("SELECT users.*, themes.id AS theme_id, themes.dark_mode, icons.image_hash FROM users LEFT JOIN themes ON users.id = themes.user_id LEFT JOIN icons ON users.id = icons.user_id WHERE users.id IN (?)", userIDs)
+	q, args, err := sqlx.In("SELECT users.*, themes.id AS theme_id, themes.dark_mode, icons.image_hash FROM users LEFT JOIN themes ON users.id = themes.user_id LEFT JOIN icons ON users.id = icons.user_id WHERE users.id IN (?)", uniqUserIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +503,7 @@ func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]Use
 			DisplayName: userAndIconAndTheme.DisplayName,
 			Description: userAndIconAndTheme.Description,
 			Theme: Theme{
-				ID:       userAndIconAndTheme.ID,
+				ID:       userAndIconAndTheme.ThemeID,
 				DarkMode: userAndIconAndTheme.DarkMode,
 			},
 			IconHash: userAndIconAndTheme.ImageHash.String,
