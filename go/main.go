@@ -13,7 +13,7 @@ import (
 	"strconv"
 
 	"github.com/isucon/isucon13/webapp/go/isuutil"
-	"github.com/kaz/pprotein/integration/echov4"
+	//"github.com/kaz/pprotein/integration/echov4"
 	"github.com/miekg/dns"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
@@ -281,7 +281,7 @@ func main() {
 
 	e.JSONSerializer = &isuutil.EchoJSONSerializer{}
 
-	echov4.EnableDebugHandler(e)
+	//echov4.EnableDebugHandler(e)
 
 	// DB接続
 	conn, err := connectDB(e.Logger)
