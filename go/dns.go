@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
+
 	"net"
 	"sync"
 
@@ -1299,7 +1299,7 @@ var userNames = sync.Map{}
 // panic時にプロセスを終了させずにログ出力するハンドラー
 func handlePanic(w dns.ResponseWriter, r *dns.Msg) {
 	if rcv := recover(); rcv != nil {
-		log.Println("[ERR] panic", rcv, w, r)
+		//log.Println("[ERR] panic", rcv, w, r)
 	}
 }
 
@@ -1325,8 +1325,8 @@ func echoHandler(w dns.ResponseWriter, r *dns.Msg) {
 		}
 
 		// この時点で応答できるかは未定だが、応答しようとしている内容をログ出力
-		log.Printf("[INFO] query: name=%s class=%s type=%s\n",
-			subDomain, dns.ClassToString[q.Qclass], dns.TypeToString[q.Qtype])
+		//log.Printf("[INFO] query: name=%s class=%s type=%s\n",
+		//	subDomain, dns.ClassToString[q.Qclass], dns.TypeToString[q.Qtype])
 
 		// レスポンスの共通ヘッダー
 		// クエリの内容をそのまま使用し、TTLは0固定でキャッシュさせない
@@ -1347,10 +1347,10 @@ func echoHandler(w dns.ResponseWriter, r *dns.Msg) {
 					m.Rcode = dns.RcodeNameError
 					err2 := w.WriteMsg(m)
 					if !errors.Is(err, ErrNotFound) {
-						log.Printf("[ERR] DNS Resolution %+v\n", err)
+						//log.Printf("[ERR] DNS Resolution %+v\n", err)
 					}
 					if err2 != nil {
-						log.Printf("[ERR] %s\n", err2.Error())
+						//log.Printf("[ERR] %s\n", err2.Error())
 					}
 					continue
 				}
@@ -1393,14 +1393,14 @@ func echoHandler(w dns.ResponseWriter, r *dns.Msg) {
 	}
 	err := w.WriteMsg(m)
 	if err != nil {
-		log.Printf("[ERR] %s", err.Error())
+		//log.Printf("[ERR] %s", err.Error())
 	}
 }
 
 // 指定ネットワークでDNSサーバー処理を実行
 func serveDNS(server *dns.Server) {
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatal("Failed to start server: ", err)
+		//log.Fatal("Failed to start server: ", err)
 	}
 }
 
