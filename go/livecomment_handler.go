@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -111,26 +112,39 @@ func getLivecommentsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestreams: "+err.Error())
 	}
 
+	userIds := make([]int64, 0)
+	for _, livecommentModel := range livecommentModels {
+		userIds = append(userIds, livecommentModel.UserID)
+	}
+
+	log.Println("debug ================= userIds", userIds)
+
+	commentOwner, err := fillUsersResponse(ctx, tx, userIds)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill users: "+err.Error())
+	}
+
+	commentOwnerMap := make(map[int64]User)
+	for _, user := range commentOwner {
+		commentOwnerMap[user.ID] = user
+	}
+
+	log.Println("debug ================= commentOwnerMap", commentOwnerMap)
+
 	livecomments := make([]Livecomment, len(livecommentModels))
 	for i := range livecommentModels {
 		livecommentModel := livecommentModels[i]
-		commentOwnerModel := UserModel{}
-		if err := tx.GetContext(ctx, &commentOwnerModel, "SELECT * FROM users WHERE id = ?", livecommentModel.UserID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch users: "+err.Error())
-		}
-		commentOwner, err := fillUserResponse(ctx, tx, commentOwnerModel)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill users: "+err.Error())
-		}
 
 		livecomment := Livecomment{
 			ID:         livecommentModel.ID,
-			User:       commentOwner,
+			User:       commentOwnerMap[livecommentModel.UserID],
 			Livestream: livestream,
 			Comment:    livecommentModel.Comment,
 			Tip:        livecommentModel.Tip,
 			CreatedAt:  livecommentModel.CreatedAt,
 		}
+
+		log.Println("debug ================= livecomment", livecomment)
 
 		livecomments[i] = livecomment
 	}

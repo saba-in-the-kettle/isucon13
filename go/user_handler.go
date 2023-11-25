@@ -440,6 +440,9 @@ type UserAndIconAndTheme struct {
 }
 
 func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]User, error) {
+	if len(userIDs) == 0 {
+		return []User{}, nil
+	}
 
 	var userAndIconAndThemes []UserAndIconAndTheme
 	q, args, err := sqlx.In("SELECT users.*, themes.id AS theme_id, themes.dark_mode, icons.image FROM users LEFT JOIN themes ON users.id = themes.user_id LEFT JOIN icons ON users.id = icons.user_id WHERE users.id IN (?)", userIDs)
