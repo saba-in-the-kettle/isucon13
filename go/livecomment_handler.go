@@ -409,10 +409,23 @@ func moderateHandler(c echo.Context) error {
 	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
 	}
+	ngedCommentIDs := make([]int64, 0)
 	for _, livecomment := range livecomments {
-		err2 := deleteNGComment(ngwords, livecomment, tx, ctx, livestreamID)
-		if err2 != nil {
-			return err2
+		for _, ngword := range ngwords {
+			if strings.Contains(livecomment.Comment, ngword.Word) {
+				ngedCommentIDs = append(ngedCommentIDs, livecomment.ID)
+			}
+			break
+		}
+	}
+
+	if len(ngedCommentIDs) > 0 {
+		q, args, err := sqlx.In(`DELETE FROM livecomments WHERE id IN (?);`, ngedCommentIDs)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
+		}
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
 		}
 	}
 
@@ -423,19 +436,6 @@ func moderateHandler(c echo.Context) error {
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"word_id": wordID,
 	})
-}
-
-func deleteNGComment(ngwords []*NGWord, livecomment *LivecommentModel, tx *sqlx.Tx, ctx context.Context, livestreamID int) error {
-	for _, ngword := range ngwords {
-		if strings.Contains(livecomment.Comment, ngword.Word) {
-			query := `DELETE FROM livecomments WHERE id = ?;`
-			if _, err := tx.ExecContext(ctx, query, livecomment.ID); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
-			}
-			return nil
-		}
-	}
-	return nil
 }
 
 // TODO: N+1 なので使わない
