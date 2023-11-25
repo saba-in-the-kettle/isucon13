@@ -212,7 +212,7 @@ func main() {
 	cookieStore := sessions.NewCookieStore(secret)
 	cookieStore.Options.Domain = "*.u.isucon.dev"
 	e.Use(session.Middleware(cookieStore))
-	// e.Use(middleware.Recover())
+	e.Use(middleware.Recover())
 	e.Use(otelecho.Middleware("webapp"))
 
 	// 初期化
