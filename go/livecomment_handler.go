@@ -406,7 +406,7 @@ func moderateHandler(c echo.Context) error {
 
 	// ライブコメント一覧取得
 	var livecomments []*LivecommentModel
-	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
+	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments WHERE livestream_id = ?", livestreamID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
 	}
 	ngedCommentIDs := make([]int64, 0)
