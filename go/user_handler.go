@@ -268,7 +268,9 @@ func registerHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
 
-	userNames.Store(user.Name, true)
+	userNameLock.Lock()
+	defer userNameLock.Unlock()
+	userNames[req.Name] = true
 
 	return c.JSON(http.StatusCreated, user)
 }
