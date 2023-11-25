@@ -5,17 +5,16 @@ package main
 
 import (
 	"fmt"
+	"github.com/isucon/isucon13/webapp/go/isuutil"
+	"github.com/kaz/pprotein/integration/echov4"
+	"github.com/miekg/dns"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
-
-	"github.com/isucon/isucon13/webapp/go/isuutil"
-	"github.com/kaz/pprotein/integration/echov4"
-	"github.com/miekg/dns"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -110,7 +109,12 @@ func connectDB(logger echo.Logger) (*sqlx.DB, error) {
 	return db, nil
 }
 
+var reactionCountCache *Cache[int64, int64]
+
 func initializeHandler(c echo.Context) error {
+	// user_id -> reaction_count
+	reactionCountCache = NewCache[int64, int64]()
+
 	if out, err := exec.Command("../sql/init.sh").CombinedOutput(); err != nil {
 		c.Logger().Errorf("init.sh failed with err=%s", string(out))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())

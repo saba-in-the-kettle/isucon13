@@ -10,6 +10,7 @@ TRUNCATE TABLE livestream_tags;
 TRUNCATE TABLE livecomments;
 TRUNCATE TABLE livestreams;
 TRUNCATE TABLE users;
+DROP TABLE IF EXISTS user_ranking;
 
 ALTER TABLE `themes` auto_increment = 1;
 ALTER TABLE `icons` auto_increment = 1;
