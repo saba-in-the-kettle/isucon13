@@ -75,7 +75,7 @@ func CreateIndexIfNotExists(db *sqlx.DB, query string) error {
 	var mysqlErr *mysql.MySQLError
 	if err != nil {
 		if errors.As(err, &mysqlErr) {
-			if mysqlErr.Number == 1061 {
+			if mysqlErr.Number == 1061 || mysqlErr.Number == 1060 {
 				fmt.Println("detected already existing index, but it's ok")
 				return nil
 			}
