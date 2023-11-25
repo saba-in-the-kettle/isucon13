@@ -260,6 +260,17 @@ func postLivecommentHandler(c echo.Context) error {
 		CreatedAt:    now,
 	}
 
+	if req.Tip > 0 {
+		// 配信者の user_id を取得
+		var livestreamModel LivestreamModel
+		if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch livestream: "+err.Error())
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE user_ranking SET tips_count = tips_count + ? WHERE id = ?", req.Tip, livestreamModel.UserID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to update user ranking: "+err.Error())
+		}
+	}
+
 	rs, err := tx.NamedExecContext(ctx, "INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (:user_id, :livestream_id, :comment, :tip, :created_at)", livecommentModel)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert livecomment: "+err.Error())

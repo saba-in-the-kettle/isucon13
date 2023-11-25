@@ -150,6 +150,24 @@ func postReactionHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert reaction: "+err.Error())
 	}
 
+	//reactionCountCache.cache.IncrementInt64(userID, 1)
+	//cachedReactionCount, ok := reactionCountCache.Get(userID)
+	//if ok {
+	//	reactionCountCache.Set(userID, cachedReactionCount + 1)
+	//} else {
+	//	reactionCountCache.Set(userID, 1)
+	//}
+
+	// 配信者の user_id を取得
+	var livestreamModel LivestreamModel
+	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch livestream: "+err.Error())
+	}
+	// 配信者の user_id に対応する reaction_count を +1
+	if _, err := tx.NamedExecContext(ctx, "UPDATE user_ranking SET reaction_count = reaction_count + 1 WHERE id = ?", livestreamModel.UserID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update user ranking: "+err.Error())
+	}
+
 	reactionID, err := result.LastInsertId()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get last inserted reaction id: "+err.Error())
