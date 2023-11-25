@@ -131,6 +131,26 @@ func initializeHandler(c echo.Context) error {
 		c.Logger().Errorf("create image hash failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index themes_user_id_index\n    on themes (user_id);\n\n"); err != nil {
+		c.Logger().Errorf("create image hash failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index reactions_livestream_id_created_at_index\n    on reactions (livestream_id asc, created_at desc);\n\n"); err != nil {
+		c.Logger().Errorf("create image hash failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index ng_words_user_id_livestream_id_created_at_index\n    on ng_words (user_id asc, livestream_id asc, created_at desc);\n\n"); err != nil {
+		c.Logger().Errorf("create image hash failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index livestream_viewers_history_user_id_livestream_id_index\n    on livestream_viewers_history (user_id, livestream_id);\n\n"); err != nil {
+		c.Logger().Errorf("create image hash failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index livestream_viewers_history_livestream_id_index\n    on livestream_viewers_history (livestream_id);\n\n"); err != nil {
+		c.Logger().Errorf("create image hash failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
 
 	if out, err := exec.Command("../pdns/init_zone.sh").CombinedOutput(); err != nil {
 		c.Logger().Warnf("init.sh failed with err=%s", string(out))
