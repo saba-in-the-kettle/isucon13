@@ -5,7 +5,7 @@ BIN_NAME:=isupipe
 SERVER_BINARY_DIR:=~/webapp/go
 SERVER_SQL_DIR:=/home/isucon/webapp
 SERVICE_NAME:=isupipe-go.service
-APP_SERVER_NAMES="s1\ns2\n"
+APP_SERVER_NAMES="s1\ns2\ns3\n"
 SERVER_NAMES="s1\ns2\ns3"
 # ↑↑↑ここまで↑↑↑
 
@@ -66,4 +66,3 @@ hargo-filter:
 hargo-fetch:
 	@$(START_ECHO)
 	hargo fetch $(HARGO_FILTERED_NAME) -dir hargo-results
-
