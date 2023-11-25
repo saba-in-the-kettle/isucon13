@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -117,8 +116,6 @@ func getLivecommentsHandler(c echo.Context) error {
 		userIds = append(userIds, livecommentModel.UserID)
 	}
 
-	log.Println("debug ================= userIds", userIds)
-
 	commentOwner, err := fillUsersResponse(ctx, tx, userIds)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill users: "+err.Error())
@@ -128,8 +125,6 @@ func getLivecommentsHandler(c echo.Context) error {
 	for _, user := range commentOwner {
 		commentOwnerMap[user.ID] = user
 	}
-
-	log.Println("debug ================= commentOwnerMap", commentOwnerMap)
 
 	livecomments := make([]Livecomment, len(livecommentModels))
 	for i := range livecommentModels {
@@ -143,8 +138,6 @@ func getLivecommentsHandler(c echo.Context) error {
 			Tip:        livecommentModel.Tip,
 			CreatedAt:  livecommentModel.CreatedAt,
 		}
-
-		log.Println("debug ================= livecomment", livecomment)
 
 		livecomments[i] = livecomment
 	}
