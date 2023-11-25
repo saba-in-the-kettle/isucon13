@@ -89,42 +89,7 @@ type PostIconResponse struct {
 }
 
 func getIconHandler(c echo.Context) error {
-	ctx := c.Request().Context()
-
-	username := c.Param("username")
-
-	tx, err := dbConn.BeginTxx(ctx, nil)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
-	}
-	defer tx.Rollback()
-
-	var user UserModel
-	if err := tx.GetContext(ctx, &user, "SELECT * FROM users WHERE name = ?", username); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusNotFound, "not found user that has the given username")
-		}
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
-	}
-
-	var iconID int64
-	if err := tx.GetContext(ctx, &iconID, "SELECT id FROM icons WHERE user_id = ?", user.ID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.File(fallbackImage)
-		} else {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user icon: "+err.Error())
-		}
-	}
-
-	image, err := os.ReadFile(filepath.Join("../icons", fmt.Sprintf("%d.jpg", iconID)))
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return c.File(fallbackImage)
-		}
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read user icon: "+err.Error())
-	}
-
-	return c.Blob(http.StatusOK, "image/jpeg", image)
+	return c.JSON(http.StatusNotFound, "go icon handler called")
 }
 
 func postIconHandler(c echo.Context) error {
@@ -139,6 +104,14 @@ func postIconHandler(c echo.Context) error {
 	sess, _ := session.Get(defaultSessionIDKey, c)
 	// existence already checked
 	userID := sess.Values[defaultUserIDKey].(int64)
+
+	var userName string
+	if err := dbConn.GetContext(ctx, &userName, "SELECT name FROM users WHERE id = ?", userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "not found user that has the given username")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
+	}
 
 	var req *PostIconRequest
 	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
@@ -166,7 +139,7 @@ func postIconHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get last inserted icon id: "+err.Error())
 	}
 
-	filename := filepath.Join("../icons", fmt.Sprintf("%d.jpg", iconID))
+	filename := filepath.Join("../icons", fmt.Sprintf("%s.jpg", userName))
 	f, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
