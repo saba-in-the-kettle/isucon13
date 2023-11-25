@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -1294,6 +1293,7 @@ var initialSubdomains = []string{
 	"satomi130",
 	"tomoya450",
 }
+
 var userNames = sync.Map{}
 
 // panic時にプロセスを終了させずにログ出力するハンドラー
@@ -1338,8 +1338,7 @@ func echoHandler(w dns.ResponseWriter, r *dns.Msg) {
 		switch q.Qclass {
 		case dns.ClassINET:
 			switch q.Qtype {
-			case dns.TypeA: // Aレコード + IPv4アドレス
-				// サブドメインをレコードとして応答する
+			case dns.TypeA:
 				ip, err := getIp(subDomain)
 				if err != nil {
 					m.Answer = append(m.Answer, &dns.A{
@@ -1410,14 +1409,35 @@ func getIp(subDomain string) (string, error) {
 		return powerDNSSubdomainAddress, nil
 	}
 
-	var i int
-	err := dbConn.Get(&i, "SELECT 1 FROM users WHERE name= ?", subDomain)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("failed to select user: %w", err)
+	//var i int
+	//err := dbConn.Get(&i, "SELECT 1 FROM users WHERE name= ?", subDomain)
+	//if err != nil {
+	//	if errors.Is(err, sql.ErrNoRows) {
+	//		return "", ErrNotFound
+	//	}
+	//	return "", fmt.Errorf("failed to select user: %w", err)
+	//}
+
+	//
+	//return powerDNSSubdomainAddress, nil
+
+	return "", ErrNotFound
+}
+
+func initializeDnsCache() error {
+	for _, subdomain := range initialSubdomains {
+		userNames.Store(subdomain, true)
 	}
 
-	return powerDNSSubdomainAddress, nil
+	var names []string
+	err := dbConn.Select(&names, "SELECT name FROM users")
+	if err != nil {
+		return fmt.Errorf("failed to select users: %w", err)
+	}
+
+	for _, name := range names {
+		userNames.Store(name, struct{}{})
+	}
+
+	return nil
 }

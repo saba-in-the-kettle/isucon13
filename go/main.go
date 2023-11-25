@@ -178,8 +178,9 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
-	for _, subdomain := range initialSubdomains {
-		userNames.Store(subdomain, true)
+	if err := initializeDnsCache(); err != nil {
+		c.Logger().Warnf("initializeDnsCache failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
@@ -281,6 +282,12 @@ func main() {
 	powerDNSSubdomainAddress = subdomainAddr
 
 	// dns
+	err = initializeDnsCache()
+	if err != nil {
+		e.Logger.Errorf("failed to initialize dns cache: %v", err)
+		os.Exit(1)
+	}
+
 	// DNSクエリハンドラーを登録
 	dns.HandleFunc(domain, echoHandler)
 
