@@ -66,11 +66,38 @@ func getReactionsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "failed to get reactions")
 	}
 
+	livestreamModel := LivestreamModel{}
+	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch livestream: "+err.Error())
+	}
+	livestream, err := fillLivestreamResponse(ctx, tx, livestreamModel)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestream: "+err.Error())
+	}
+
+	userIds := make([]int64, len(reactionModels))
+	for i, reactionModel := range reactionModels {
+		userIds[i] = reactionModel.UserID
+	}
+
+	users, err := fillUsersResponse(ctx, tx, userIds)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill reaction: "+err.Error())
+	}
+
+	userMap := make(map[int64]User)
+	for _, user := range users {
+		userMap[user.ID] = user
+	}
+
 	reactions := make([]Reaction, len(reactionModels))
-	for i := range reactionModels {
-		reaction, err := fillReactionResponse(ctx, tx, reactionModels[i])
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill reaction: "+err.Error())
+	for i, reactionModel := range reactionModels {
+		reaction := Reaction{
+			ID:         reactionModel.ID,
+			EmojiName:  reactionModel.EmojiName,
+			User:       userMap[reactionModel.UserID],
+			Livestream: livestream,
+			CreatedAt:  reactionModel.CreatedAt,
 		}
 
 		reactions[i] = reaction
