@@ -1,0 +1,29 @@
+[Unit]
+Description=isupipe-go
+After=syslog.target
+After=mysql.service
+Requires=mysql.service
+
+# 起動失敗時の再起動回数をできるだけ増やす
+StartLimitBurst=999
+
+[Service]
+WorkingDirectory=/home/isucon/webapp/go
+EnvironmentFile=/home/isucon/env.sh
+
+User=isucon
+Group=isucon
+ExecStart=/home/isucon/webapp/go/isupipe
+ExecStop=/bin/kill -s QUIT $MAINPID
+
+Restart=on-failure
+RestartSec=5
+
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_CHOWN
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_CHOWN
+
+# ファイルディスクリプタを増やす
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
