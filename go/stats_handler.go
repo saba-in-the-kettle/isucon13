@@ -254,24 +254,23 @@ func getLivestreamStatisticsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 	}
 
-	type UserReactionCount struct {
-		UserID        int64  `db:"user_id"`
-		Username      string `db:"username"`
-		ReactionCount int64  `db:"reaction_count"`
+	type LiveReactionCount struct {
+		ID            int64 `db:"id"`
+		ReactionCount int64 `db:"reaction_count"`
 	}
 
-	var userReactionCounts []UserReactionCount
+	var userReactionCounts []LiveReactionCount
 	if err := tx.SelectContext(ctx, &userReactionCounts, `
-		SELECT l.id, COUNT(1) FROM livestreams l
+		SELECT l.id, COUNT(1) as reaction_count FROM livestreams l
 INNER JOIN reactions r ON l.id = r.livestream_id
 GROUP BY l.id
 		`); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
 	}
 
-	userIdReactionsMap := make(map[int64]int64)
-	for _, userReactionCount := range userReactionCounts {
-		userIdReactionsMap[userReactionCount.UserID] = userReactionCount.ReactionCount
+	liveIdReactionsMap := make(map[int64]int64)
+	for _, liveReactionCount := range userReactionCounts {
+		liveIdReactionsMap[liveReactionCount.ID] = liveReactionCount.ReactionCount
 	}
 
 	// ランク算出
@@ -282,7 +281,7 @@ GROUP BY l.id
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
 		}
 
-		reactions, ok := userIdReactionsMap[livestream.ID]
+		reactions, ok := liveIdReactionsMap[livestream.ID]
 		if !ok {
 			reactions = 0
 		}
