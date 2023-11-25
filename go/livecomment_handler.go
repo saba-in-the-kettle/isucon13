@@ -404,26 +404,28 @@ func moderateHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get NG words: "+err.Error())
 	}
 
-	// NGワードにヒットする過去の投稿も全削除する
-	for _, ngword := range ngwords {
-		// ライブコメント一覧取得
-		var livecomments []*LivecommentModel
-		if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
-		}
-
-		for _, livecomment := range livecomments {
+	// ライブコメント一覧取得
+	var livecomments []*LivecommentModel
+	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
+	}
+	ngedCommentIDs := make([]int64, 0)
+	for _, livecomment := range livecomments {
+		for _, ngword := range ngwords {
 			if strings.Contains(livecomment.Comment, ngword.Word) {
-				query := `
-			DELETE FROM livecomments
-			WHERE
-			id = ? AND
-			livestream_id = ?;
-			`
-				if _, err := tx.ExecContext(ctx, query, livecomment.ID, livestreamID); err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
-				}
+				ngedCommentIDs = append(ngedCommentIDs, livecomment.ID)
 			}
+			break
+		}
+	}
+
+	if len(ngedCommentIDs) > 0 {
+		q, args, err := sqlx.In(`DELETE FROM livecomments WHERE id IN (?);`, ngedCommentIDs)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
+		}
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
 		}
 	}
 
