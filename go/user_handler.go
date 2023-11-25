@@ -470,6 +470,9 @@ type UserAndIconAndTheme struct {
 }
 
 func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]User, error) {
+	if len(userIDs) == 0 {
+		return []User{}, nil
+	}
 
 	slices.Sort(userIDs)
 	uniqUserIDs := slices.Compact(userIDs)
