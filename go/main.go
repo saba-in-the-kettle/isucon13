@@ -213,7 +213,7 @@ func main() {
 
 	e := echo.New()
 	e.Debug = true
-	e.Logger.SetLevel(echolog.DEBUG)
+	e.Logger.SetLevel(echolog.OFF)
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "time=${time_rfc3339_nano} method=${method}, uri=${uri}, status=${status}, latency=${latency_human}, error=${error}\n",
 	}))
