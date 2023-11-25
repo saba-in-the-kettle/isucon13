@@ -1345,9 +1345,12 @@ func echoHandler(w dns.ResponseWriter, r *dns.Msg) {
 						Hdr: rr_header_nx,
 					})
 					m.Rcode = dns.RcodeNameError
-					w.WriteMsg(m)
+					err2 := w.WriteMsg(m)
 					if !errors.Is(err, ErrNotFound) {
 						log.Printf("[ERR] DNS Resolution %+v\n", err)
+					}
+					if err2 != nil {
+						log.Printf("[ERR] %s\n", err2.Error())
 					}
 					continue
 				}
@@ -1424,9 +1427,13 @@ func getIp(subDomain string) (string, error) {
 	return "", ErrNotFound
 }
 
-func initializeDnsCache() error {
-	for _, subdomain := range initialSubdomains {
-		userNames.Store(subdomain, true)
+func initializeDnsCache(dbOnly bool) error {
+	// initialize は同時に呼ばれないので thread-safe ではなくて良い
+	userNames = sync.Map{}
+	if !dbOnly {
+		for _, subdomain := range initialSubdomains {
+			userNames.Store(subdomain, true)
+		}
 	}
 
 	var names []string
