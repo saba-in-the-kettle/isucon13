@@ -1425,6 +1425,8 @@ func getIp(subDomain string) (string, error) {
 }
 
 func initializeDnsCache() error {
+	// initialize は同時に呼ばれないので thread-safe ではなくて良い
+	userNames = sync.Map{}
 	for _, subdomain := range initialSubdomains {
 		userNames.Store(subdomain, true)
 	}
