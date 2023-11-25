@@ -173,6 +173,11 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index reservation_slots_start_at_index\n    on reservation_slots (start_at);\n\n"); err != nil {
+		c.Logger().Errorf("create reservation_slots_start_at_index failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+
 	if out, err := exec.Command("../pdns/init_zone.sh").CombinedOutput(); err != nil {
 		c.Logger().Warnf("init.sh failed with err=%s", string(out))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
