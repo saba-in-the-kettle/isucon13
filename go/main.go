@@ -178,7 +178,7 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
-	if err := initializeDnsCache(); err != nil {
+	if err := initializeDnsCache(false); err != nil {
 		c.Logger().Warnf("initializeDnsCache failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
@@ -282,7 +282,7 @@ func main() {
 	powerDNSSubdomainAddress = subdomainAddr
 
 	// dns
-	err = initializeDnsCache()
+	err = initializeDnsCache(false)
 	if err != nil {
 		e.Logger.Errorf("failed to initialize dns cache: %v", err)
 		os.Exit(1)
