@@ -189,10 +189,10 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
-	if err := isuutil.KickPproteinCollect(); err != nil {
-		c.Logger().Warnf("pprotein collect failed with err=%s", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
-	}
+	//if err := isuutil.KickPproteinCollect(); err != nil {
+	//	c.Logger().Warnf("pprotein collect failed with err=%s", err)
+	//	return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	//}
 
 	if err := initializeDnsCache(false); err != nil {
 		c.Logger().Warnf("initializeDnsCache failed with err=%s", err)
@@ -206,17 +206,17 @@ func initializeHandler(c echo.Context) error {
 }
 
 func main() {
-	_, err := isuutil.InitializeTracerProvider()
-	if err != nil {
-		panic(err)
-	}
+	//_, err := isuutil.InitializeTracerProvider()
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	e := echo.New()
-	e.Debug = true
+	e.Debug = false
 	e.Logger.SetLevel(echolog.OFF)
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: "time=${time_rfc3339_nano} method=${method}, uri=${uri}, status=${status}, latency=${latency_human}, error=${error}\n",
-	}))
+	//e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+	//	Format: "time=${time_rfc3339_nano} method=${method}, uri=${uri}, status=${status}, latency=${latency_human}, error=${error}\n",
+	//}))
 	cookieStore := sessions.NewCookieStore(secret)
 	cookieStore.Options.Domain = "*.u.isucon.dev"
 	e.Use(session.Middleware(cookieStore))
