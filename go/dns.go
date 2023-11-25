@@ -1294,7 +1294,8 @@ var initialSubdomains = []string{
 	"tomoya450",
 }
 
-var userNames = sync.Map{}
+var userNames = map[string]bool{}
+var userNameLock sync.RWMutex
 
 // panic時にプロセスを終了させずにログ出力するハンドラー
 func handlePanic(w dns.ResponseWriter, r *dns.Msg) {
@@ -1408,7 +1409,9 @@ func getIp(subDomain string) (string, error) {
 	if subDomain == "" {
 		return powerDNSSubdomainAddress, nil
 	}
-	if _, ok := userNames.Load(subDomain); ok {
+	userNameLock.RLock()
+	defer userNameLock.RUnlock()
+	if _, ok := userNames[subDomain]; ok {
 		return powerDNSSubdomainAddress, nil
 	}
 
@@ -1429,10 +1432,12 @@ func getIp(subDomain string) (string, error) {
 
 func initializeDnsCache(dbOnly bool) error {
 	// initialize は同時に呼ばれないので thread-safe ではなくて良い
-	userNames = sync.Map{}
+	userNameLock.Lock()
+	defer userNameLock.Unlock()
+	userNames = map[string]bool{}
 	if !dbOnly {
 		for _, subdomain := range initialSubdomains {
-			userNames.Store(subdomain, true)
+			userNames[subdomain] = true
 		}
 	}
 
@@ -1443,7 +1448,7 @@ func initializeDnsCache(dbOnly bool) error {
 	}
 
 	for _, name := range names {
-		userNames.Store(name, struct{}{})
+		userNames[name] = true
 	}
 
 	return nil
