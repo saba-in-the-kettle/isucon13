@@ -78,6 +78,12 @@ max_binlog_size   = 100M
 # binlog_ignore_db	= include_database_name
 
 [mysqld]
+max_connections=10000
+innodb_buffer_pool_size = 3G # メモリの75%程度を指定
+innodb_flush_log_at_trx_commit = 0
+innodb_flush_method = O_DIRECT
+disable-log-bin
+
 slow_query_log=ON
 long_query_time=0
 slow_query_log_file = /var/log/mysql/mysql-slow.log
