@@ -92,29 +92,51 @@ func getUserStatisticsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get users: "+err.Error())
 	}
 
-	var ranking UserRanking
-	for _, user := range users {
-		var reactions int64
-		query := `
-		SELECT COUNT(*) FROM users u
+	type UserReactionCount struct {
+		UserID        int64  `db:"user_id"`
+		Username      string `db:"username"`
+		ReactionCount int64  `db:"reaction_count"`
+	}
+
+	var userReactionCounts []UserReactionCount
+	if err := tx.SelectContext(ctx, &userReactionCounts, `
+		SELECT u.id as user_id, u.name as username, COUNT(*) as reaction_count FROM users u
 		INNER JOIN livestreams l ON l.user_id = u.id
 		INNER JOIN reactions r ON r.livestream_id = l.id
-		WHERE u.id = ?`
-		if err := tx.GetContext(ctx, &reactions, query, user.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-		}
+		GROUP BY u.id
+		`); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
+	}
 
-		var tips int64
-		query = `
-		SELECT IFNULL(SUM(l2.tip), 0) FROM users u
-		INNER JOIN livestreams l ON l.user_id = u.id	
+	userIdReactionsMap := make(map[int64]int64)
+	for _, userReactionCount := range userReactionCounts {
+		userIdReactionsMap[userReactionCount.UserID] = userReactionCount.ReactionCount
+	}
+
+	type UserTipCount struct {
+		UserID   int64  `db:"user_id"`
+		Username string `db:"username"`
+		TipCount int64  `db:"tip_count"`
+	}
+
+	var userTipCounts []UserTipCount
+	if err := tx.SelectContext(ctx, &userTipCounts, `
+		SELECT u.id as user_id, u.name as username, IFNULL(SUM(l2.tip), 0) as tip_count FROM users u
+		INNER JOIN livestreams l ON l.user_id = u.id
 		INNER JOIN livecomments l2 ON l2.livestream_id = l.id
-		WHERE u.id = ?`
-		if err := tx.GetContext(ctx, &tips, query, user.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-		}
+		GROUP BY u.id
+		`); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
+	}
 
-		score := reactions + tips
+	userIdTipsMap := make(map[int64]int64)
+	for _, userTipCount := range userTipCounts {
+		userIdTipsMap[userTipCount.UserID] = userTipCount.TipCount
+	}
+
+	var ranking UserRanking
+	for _, user := range users {
+		score := userIdReactionsMap[user.ID] + userIdTipsMap[user.ID]
 		ranking = append(ranking, UserRankingEntry{
 			Username: user.Name,
 			Score:    score,
