@@ -110,7 +110,16 @@ func connectDB(logger echo.Logger) (*sqlx.DB, error) {
 
 func initializeHandler(c echo.Context) error {
 	if out, err := exec.Command("../sql/init.sh").CombinedOutput(); err != nil {
-		c.Logger().Warnf("init.sh failed with err=%s", string(out))
+		c.Logger().Errorf("init.sh failed with err=%s", string(out))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index livestream_tags_tag_id_index\n    on livestream_tags (tag_id);\n\n"); err != nil {
+		c.Logger().Errorf("create index failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index livestream_tags_livestream_id_index\n    on livestream_tags (livestream_id);\n\n"); err != nil {
+		c.Logger().Errorf("create index failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
