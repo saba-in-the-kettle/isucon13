@@ -404,26 +404,15 @@ func moderateHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get NG words: "+err.Error())
 	}
 
-	// NGワードにヒットする過去の投稿も全削除する
-	for _, ngword := range ngwords {
-		// ライブコメント一覧取得
-		var livecomments []*LivecommentModel
-		if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
-		}
-
-		for _, livecomment := range livecomments {
-			if strings.Contains(livecomment.Comment, ngword.Word) {
-				query := `
-			DELETE FROM livecomments
-			WHERE
-			id = ? AND
-			livestream_id = ?;
-			`
-				if _, err := tx.ExecContext(ctx, query, livecomment.ID, livestreamID); err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
-				}
-			}
+	// ライブコメント一覧取得
+	var livecomments []*LivecommentModel
+	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
+	}
+	for _, livecomment := range livecomments {
+		err2 := deleteNGComment(ngwords, livecomment, tx, ctx, livestreamID)
+		if err2 != nil {
+			return err2
 		}
 	}
 
@@ -434,6 +423,19 @@ func moderateHandler(c echo.Context) error {
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"word_id": wordID,
 	})
+}
+
+func deleteNGComment(ngwords []*NGWord, livecomment *LivecommentModel, tx *sqlx.Tx, ctx context.Context, livestreamID int) error {
+	for _, ngword := range ngwords {
+		if strings.Contains(livecomment.Comment, ngword.Word) {
+			query := `DELETE FROM livecomments WHERE id = ?;`
+			if _, err := tx.ExecContext(ctx, query, livecomment.ID); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old livecomments that hit spams: "+err.Error())
+			}
+			return nil
+		}
+	}
+	return nil
 }
 
 // TODO: N+1 なので使わない
