@@ -204,13 +204,15 @@ func searchLivestreamsHandler(c echo.Context) error {
 			livestreamIDs = append(livestreamIDs, keyTaggedLivestream.LivestreamID)
 		}
 
-		q, args, err := sqlx.In("SELECT * FROM livestreams WHERE id IN (?) ", livestreamIDs)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
-		}
-		err = tx.SelectContext(ctx, &livestreamModels, q, args...)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
+		if len(livestreamIDs) > 0 {
+			q, args, err := sqlx.In("SELECT * FROM livestreams WHERE id IN (?) ORDER BY id DESC ", livestreamIDs)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
+			}
+			err = tx.SelectContext(ctx, &livestreamModels, q, args...)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
+			}
 		}
 	} else {
 		// 検索条件なし
