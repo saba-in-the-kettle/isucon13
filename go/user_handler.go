@@ -106,7 +106,7 @@ func postIconHandler(c echo.Context) error {
 	userID := sess.Values[defaultUserIDKey].(int64)
 
 	var userName string
-	if err := dbConn.GetContext(ctx, &userName, "SELECT * FROM users WHERE id = ?", userID); err != nil {
+	if err := dbConn.GetContext(ctx, &userName, "SELECT name FROM users WHERE id = ?", userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "not found user that has the given username")
 		}
