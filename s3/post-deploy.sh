@@ -10,4 +10,5 @@ set -e
 truncate -s 0 /var/log/mysql/mysql-slow.log
 truncate -s 0 /var/log/nginx/access.log
 
-sudo systemctl restart mysql nginx
+sudo systemctl disable --now nginx
+sudo systemctl disable --now mysql
