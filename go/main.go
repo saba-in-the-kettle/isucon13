@@ -123,9 +123,28 @@ func initializeHandler(c echo.Context) error {
 		c.Logger().Errorf("create index failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "create index icons_user_id_index\n    on icons (user_id);\n\n"); err != nil {
+		c.Logger().Errorf("create index failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "alter table icons\n    add image_hash varchar(256) default '' not null;\n\n"); err != nil {
+		c.Logger().Errorf("create image hash failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
 
 	if out, err := exec.Command("../pdns/init_zone.sh").CombinedOutput(); err != nil {
 		c.Logger().Warnf("init.sh failed with err=%s", string(out))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+
+	// iconsディレクトリの中身をすべて削除する
+	if err := os.RemoveAll("../icons"); err != nil {
+		c.Logger().Warnf("failed to remove icons directory with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	// iconsディレクトリを作成する
+	if err := os.Mkdir("../icons", 0755); err != nil {
+		c.Logger().Warnf("failed to create icons directory with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 

@@ -15,7 +15,7 @@ import (
 const (
 	// traceIDRatioBased はトレースのサンプリングレート
 	// Jaegerが一度に表示できるトレース数が1500なので、パフォーマンス改善に応じて調整する
-	traceIDRatioBased = 0.1
+	traceIDRatioBased = 0.01
 	// 基本的にWatchTowerにホストされているJaegerにTraceを送る
 	endpoint = "watchtower:4317"
 
