@@ -104,11 +104,35 @@ func getUserStatisticsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user ranking: "+err.Error())
 	}
 
+	//type UserTips struct {
+	//	UserID int64 `db:"user_id"`
+	//	Tips   int64 `db:"tips"`
+	//}
+	//
+	//var userTips []*UserTips
+	//query := `
+	//	SELECT u.id as user_id, IFNULL(SUM(l2.tip), 0) as tips FROM users u
+	//	INNER JOIN livestreams l ON l.user_id = u.id
+	//	INNER JOIN livecomments l2 ON l2.livestream_id = l.id`
+	//if err := tx.SelectContext(ctx, &userTips, query, userRankingModel.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	//	return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
+	//}
+
 	var ranking UserRanking
 	for _, userRankingModel := range userRankingModels {
+		var tips int64
+		query := `
+		SELECT IFNULL(SUM(l2.tip), 0) FROM users u
+		INNER JOIN livestreams l ON l.user_id = u.id	
+		INNER JOIN livecomments l2 ON l2.livestream_id = l.id
+		WHERE u.id = ?`
+		if err := tx.GetContext(ctx, &tips, query, userRankingModel.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
+		}
+
 		ranking = append(ranking, UserRankingEntry{
 			Username: userRankingModel.Name,
-			Score:    userRankingModel.ReactionCount + userRankingModel.TipsCount,
+			Score:    userRankingModel.ReactionCount + tips,
 		})
 	}
 

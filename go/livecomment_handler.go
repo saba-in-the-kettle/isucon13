@@ -430,6 +430,7 @@ func moderateHandler(c echo.Context) error {
 
 	// NGワードにヒットする過去の投稿も全削除する
 	for _, ngword := range ngwords {
+		// TODO: これ外に出したい
 		// ライブコメント一覧取得
 		var livecomments []*LivecommentModel
 		if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments"); err != nil {
