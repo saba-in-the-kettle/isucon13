@@ -5,6 +5,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/isucon/isucon13/webapp/go/isuutil"
+	"github.com/kaz/pprotein/integration/echov4"
 	"log"
 	"net"
 	"net/http"
@@ -112,6 +114,11 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
+	if err := isuutil.KickPproteinCollect(); err != nil {
+		c.Logger().Warnf("pprotein collect failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
@@ -183,6 +190,8 @@ func main() {
 	e.GET("/api/payment", GetPaymentResult)
 
 	e.HTTPErrorHandler = errorResponseHandler
+
+	echov4.EnableDebugHandler(e)
 
 	// DB接続
 	conn, err := connectDB(e.Logger)
