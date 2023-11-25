@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel"
 	"net/http"
 	"strconv"
 	"time"
@@ -197,13 +198,21 @@ func searchLivestreamsHandler(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get keyTaggedLivestreams: "+err.Error())
 		}
 
+		var livestreamIDs []int64
+
 		for _, keyTaggedLivestream := range keyTaggedLivestreams {
-			ls := LivestreamModel{}
-			if err := tx.GetContext(ctx, &ls, "SELECT * FROM livestreams WHERE id = ?", keyTaggedLivestream.LivestreamID); err != nil {
+			livestreamIDs = append(livestreamIDs, keyTaggedLivestream.LivestreamID)
+		}
+
+		if len(livestreamIDs) > 0 {
+			q, args, err := sqlx.In("SELECT * FROM livestreams WHERE id IN (?) ORDER BY id DESC ", livestreamIDs)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
+			}
+			err = tx.SelectContext(ctx, &livestreamModels, q, args...)
+			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 			}
-
-			livestreamModels = append(livestreamModels, &ls)
 		}
 	} else {
 		// 検索条件なし
@@ -485,6 +494,9 @@ func getLivecommentReportsHandler(c echo.Context) error {
 }
 
 func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel LivestreamModel) (Livestream, error) {
+	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "fillLivestreamResponse")
+	defer span.End()
+
 	ownerModel := UserModel{}
 	if err := tx.GetContext(ctx, &ownerModel, "SELECT * FROM users WHERE id = ?", livestreamModel.UserID); err != nil {
 		return Livestream{}, err
