@@ -14,6 +14,7 @@ import (
 
 	"github.com/isucon/isucon13/webapp/go/isuutil"
 	"github.com/kaz/pprotein/integration/echov4"
+	"github.com/miekg/dns"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 
 	"github.com/go-sql-driver/mysql"
@@ -127,7 +128,7 @@ func initializeHandler(c echo.Context) error {
 		c.Logger().Errorf("create index failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
-	if err := isuutil.CreateIndexIfNotExists(dbConn, "alter table icons\n    add image_hash varchar(256) default '' not null;\n\n"); err != nil {
+	if err := isuutil.CreateIndexIfNotExists(dbConn, "ALTER TABLE icons\n    ADD image_hash VARCHAR(256) DEFAULT '' NOT NULL;\n\n"); err != nil {
 		c.Logger().Errorf("create image hash failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
@@ -178,6 +179,11 @@ func initializeHandler(c echo.Context) error {
 
 	if err := isuutil.KickPproteinCollect(); err != nil {
 		c.Logger().Warnf("pprotein collect failed with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+
+	if err := initializeDnsCache(); err != nil {
+		c.Logger().Warnf("initializeDnsCache failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
@@ -278,6 +284,26 @@ func main() {
 		os.Exit(1)
 	}
 	powerDNSSubdomainAddress = subdomainAddr
+
+	// dns
+	err = initializeDnsCache()
+	if err != nil {
+		e.Logger.Errorf("failed to initialize dns cache: %v", err)
+		os.Exit(1)
+	}
+
+	// DNSクエリハンドラーを登録
+	dns.HandleFunc(domain, echoHandler)
+
+	// UDP でリッスン開始（go ルーチン）
+	udpSrv := &dns.Server{Addr: addr, Net: "udp"}
+	defer udpSrv.Shutdown()
+	go serveDNS(udpSrv)
+
+	// TCP でリッスン開始（go ルーチン）
+	tcpSrv := &dns.Server{Addr: addr, Net: "tcp"}
+	defer tcpSrv.Shutdown()
+	go serveDNS(tcpSrv)
 
 	// HTTPサーバ起動
 	listenAddr := net.JoinHostPort("", strconv.Itoa(listenPort))
