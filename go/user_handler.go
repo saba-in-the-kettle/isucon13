@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -104,13 +107,21 @@ func getIconHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
 	}
 
-	var image []byte
-	if err := tx.GetContext(ctx, &image, "SELECT image FROM icons WHERE user_id = ?", user.ID); err != nil {
+	var iconID int64
+	if err := tx.GetContext(ctx, &iconID, "SELECT id FROM icons WHERE user_id = ?", user.ID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.File(fallbackImage)
 		} else {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user icon: "+err.Error())
 		}
+	}
+
+	image, err := os.ReadFile(filepath.Join("../icons", fmt.Sprintf("%d.jpg", iconID)))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return c.File(fallbackImage)
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read user icon: "+err.Error())
 	}
 
 	return c.Blob(http.StatusOK, "image/jpeg", image)
@@ -144,7 +155,8 @@ func postIconHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete old user icon: "+err.Error())
 	}
 
-	rs, err := tx.ExecContext(ctx, "INSERT INTO icons (user_id, image) VALUES (?, ?)", userID, req.Image)
+	iconHash := sha256.Sum256(req.Image)
+	rs, err := tx.ExecContext(ctx, "INSERT INTO icons (user_id, image, image_hash) VALUES (?, ?, ?)", userID, []byte{}, fmt.Sprintf("%x", iconHash))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert new user icon: "+err.Error())
 	}
@@ -152,6 +164,20 @@ func postIconHandler(c echo.Context) error {
 	iconID, err := rs.LastInsertId()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get last inserted icon id: "+err.Error())
+	}
+
+	filename := filepath.Join("../icons", fmt.Sprintf("%d.jpg", iconID))
+	f, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+
+	}
+	defer f.Close()
+
+	reader := bytes.NewReader(req.Image)
+	_, err = io.Copy(f, reader)
+	if err != nil {
+		return fmt.Errorf("failed to copy image: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -404,17 +430,17 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 		return User{}, err
 	}
 
-	var image []byte
-	if err := tx.GetContext(ctx, &image, "SELECT image FROM icons WHERE user_id = ?", userModel.ID); err != nil {
+	var imageHash string
+	if err := tx.GetContext(ctx, &imageHash, "SELECT image_hash FROM icons WHERE user_id = ?", userModel.ID); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return User{}, err
 		}
-		image, err = os.ReadFile(fallbackImage)
+		image, err := os.ReadFile(fallbackImage)
 		if err != nil {
 			return User{}, err
 		}
+		imageHash = fmt.Sprintf("%x", sha256.Sum256(image))
 	}
-	iconHash := sha256.Sum256(image)
 
 	user := User{
 		ID:          userModel.ID,
@@ -425,7 +451,7 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 			ID:       themeModel.ID,
 			DarkMode: themeModel.DarkMode,
 		},
-		IconHash: fmt.Sprintf("%x", iconHash),
+		IconHash: imageHash,
 	}
 
 	return user, nil
@@ -434,15 +460,15 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 type UserAndIconAndTheme struct {
 	UserModel
 	// Theme
-	ID       int64  `db:"theme_id"`
-	DarkMode bool   `db:"dark_mode"`
-	Image    []byte `db:"image"`
+	ID        int64  `db:"theme_id"`
+	DarkMode  bool   `db:"dark_mode"`
+	ImageHash string `db:"image_hash"`
 }
 
 func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]User, error) {
 
 	var userAndIconAndThemes []UserAndIconAndTheme
-	q, args, err := sqlx.In("SELECT users.*, themes.id AS theme_id, themes.dark_mode, icons.image FROM users LEFT JOIN themes ON users.id = themes.user_id LEFT JOIN icons ON users.id = icons.user_id WHERE users.id IN (?)", userIDs)
+	q, args, err := sqlx.In("SELECT users.*, themes.id AS theme_id, themes.dark_mode, icons.image_hash FROM users LEFT JOIN themes ON users.id = themes.user_id LEFT JOIN icons ON users.id = icons.user_id WHERE users.id IN (?)", userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -453,13 +479,13 @@ func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]Use
 	users := make([]User, len(userAndIconAndThemes))
 
 	for i, userAndIconAndTheme := range userAndIconAndThemes {
-		if userAndIconAndTheme.Image == nil {
-			userAndIconAndTheme.Image, err = os.ReadFile(fallbackImage)
+		if userAndIconAndTheme.ImageHash == "" {
+			image, err := os.ReadFile(fallbackImage)
 			if err != nil {
 				return nil, err
 			}
+			userAndIconAndTheme.ImageHash = fmt.Sprintf("%x", sha256.Sum256(image))
 		}
-		iconHash := sha256.Sum256(userAndIconAndTheme.Image)
 
 		users[i] = User{
 			ID:          userAndIconAndTheme.ID,
@@ -470,7 +496,7 @@ func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]Use
 				ID:       userAndIconAndTheme.ID,
 				DarkMode: userAndIconAndTheme.DarkMode,
 			},
-			IconHash: fmt.Sprintf("%x", iconHash),
+			IconHash: userAndIconAndTheme.ImageHash,
 		}
 	}
 
