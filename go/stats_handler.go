@@ -273,17 +273,38 @@ GROUP BY l.id
 		liveIdReactionsMap[liveReactionCount.ID] = liveReactionCount.ReactionCount
 	}
 
+	type LiveTipCount struct {
+		ID       int64 `db:"id"`
+		TipCount int64 `db:"tip_count"`
+	}
+
+	var liveTipCounts []LiveTipCount
+	if err := tx.SelectContext(ctx, &liveTipCounts, `
+		SELECT l.id, IFNULL(SUM(l2.tip), 0) as tip_count FROM livestreams l
+INNER JOIN livecomments l2 ON l.id = l2.livestream_id
+GROUP BY l.id
+
+		`); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
+	}
+
+	liveTipsMap := make(map[int64]int64)
+	for _, liveTipCount := range liveTipCounts {
+		liveTipsMap[liveTipCount.ID] = liveTipCount.TipCount
+	}
+
 	// ランク算出
 	var ranking LivestreamRanking
 	for _, livestream := range livestreams {
 		var totalTips int64
-		if err := tx.GetContext(ctx, &totalTips, "SELECT IFNULL(SUM(l2.tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l.id = l2.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-		}
-
 		reactions, ok := liveIdReactionsMap[livestream.ID]
 		if !ok {
 			reactions = 0
+		}
+
+		totalTips, ok = liveTipsMap[livestream.ID]
+		if !ok {
+			totalTips = 0
 		}
 
 		score := reactions + totalTips
