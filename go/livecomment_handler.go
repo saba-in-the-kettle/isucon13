@@ -102,11 +102,34 @@ func getLivecommentsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
 	}
 
+	livestreamModel := LivestreamModel{}
+	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch livestreams: "+err.Error())
+	}
+	livestream, err := fillLivestreamResponse(ctx, tx, livestreamModel)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill livestreams: "+err.Error())
+	}
+
 	livecomments := make([]Livecomment, len(livecommentModels))
 	for i := range livecommentModels {
-		livecomment, err := fillLivecommentResponse(ctx, tx, livecommentModels[i])
+		livecommentModel := livecommentModels[i]
+		commentOwnerModel := UserModel{}
+		if err := tx.GetContext(ctx, &commentOwnerModel, "SELECT * FROM users WHERE id = ?", livecommentModel.UserID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch users: "+err.Error())
+		}
+		commentOwner, err := fillUserResponse(ctx, tx, commentOwnerModel)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fil livecomments: "+err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill users: "+err.Error())
+		}
+
+		livecomment := Livecomment{
+			ID:         livecommentModel.ID,
+			User:       commentOwner,
+			Livestream: livestream,
+			Comment:    livecommentModel.Comment,
+			Tip:        livecommentModel.Tip,
+			CreatedAt:  livecommentModel.CreatedAt,
 		}
 
 		livecomments[i] = livecomment
@@ -422,6 +445,7 @@ func moderateHandler(c echo.Context) error {
 	})
 }
 
+// TODO: N+1 なので使わない
 func fillLivecommentResponse(ctx context.Context, tx *sqlx.Tx, livecommentModel LivecommentModel) (Livecomment, error) {
 	commentOwnerModel := UserModel{}
 	if err := tx.GetContext(ctx, &commentOwnerModel, "SELECT * FROM users WHERE id = ?", livecommentModel.UserID); err != nil {
