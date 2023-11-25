@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -11,6 +13,7 @@ import (
 
 var domain = "u.isucon.dev"
 var addr = ":53"
+var ErrNotFound = fmt.Errorf("not found")
 
 var initialSubdomains = []string{
 	"ns1",
@@ -1344,6 +1347,9 @@ func echoHandler(w dns.ResponseWriter, r *dns.Msg) {
 					})
 					m.Rcode = dns.RcodeNameError
 					w.WriteMsg(m)
+					if !errors.Is(err, ErrNotFound) {
+						log.Printf("[ERR] DNS Resolution %+v\n", err)
+					}
 					continue
 				}
 				m.Answer = append(m.Answer, &dns.A{
@@ -1397,17 +1403,21 @@ func serveDNS(server *dns.Server) {
 }
 
 func getIp(subDomain string) (string, error) {
+	if subDomain == "" {
+		return powerDNSSubdomainAddress, nil
+	}
 	if _, ok := userNames.Load(subDomain); ok {
 		return powerDNSSubdomainAddress, nil
 	}
-	var exists bool
-	err := dbConn.Select(&exists, "SELECT EXISTS (SELECT * FROM users WHERE name= ?)", subDomain)
+
+	var i int
+	err := dbConn.Get(&i, "SELECT 1 FROM users WHERE name= ?", subDomain)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrNotFound
+		}
 		return "", fmt.Errorf("failed to select user: %w", err)
 	}
-	if exists {
-		return powerDNSSubdomainAddress, nil
-	}
 
-	return "", fmt.Errorf("not found")
+	return powerDNSSubdomainAddress, nil
 }

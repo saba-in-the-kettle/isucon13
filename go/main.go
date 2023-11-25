@@ -178,6 +178,10 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
+	for _, subdomain := range initialSubdomains {
+		userNames.Store(subdomain, true)
+	}
+
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
@@ -277,9 +281,6 @@ func main() {
 	powerDNSSubdomainAddress = subdomainAddr
 
 	// dns
-	for _, subdomain := range initialSubdomains {
-		userNames.Store(subdomain, true)
-	}
 	// DNSクエリハンドラーを登録
 	dns.HandleFunc(domain, echoHandler)
 
