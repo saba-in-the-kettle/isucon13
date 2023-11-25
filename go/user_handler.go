@@ -430,7 +430,7 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 		return User{}, err
 	}
 
-	var imageHash string
+	var imageHash sql.NullString
 	if err := tx.GetContext(ctx, &imageHash, "SELECT image_hash FROM icons WHERE user_id = ?", userModel.ID); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return User{}, err
@@ -439,7 +439,10 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 		if err != nil {
 			return User{}, err
 		}
-		imageHash = fmt.Sprintf("%x", sha256.Sum256(image))
+		imageHash = sql.NullString{
+			String: fmt.Sprintf("%x", sha256.Sum256(image)),
+			Valid:  true,
+		}
 	}
 
 	user := User{
@@ -451,7 +454,7 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 			ID:       themeModel.ID,
 			DarkMode: themeModel.DarkMode,
 		},
-		IconHash: imageHash,
+		IconHash: imageHash.String,
 	}
 
 	return user, nil
@@ -460,9 +463,9 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 type UserAndIconAndTheme struct {
 	UserModel
 	// Theme
-	ID        int64  `db:"theme_id"`
-	DarkMode  bool   `db:"dark_mode"`
-	ImageHash string `db:"image_hash"`
+	ID        int64          `db:"theme_id"`
+	DarkMode  bool           `db:"dark_mode"`
+	ImageHash sql.NullString `db:"image_hash"`
 }
 
 func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]User, error) {
@@ -479,12 +482,15 @@ func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]Use
 	users := make([]User, len(userAndIconAndThemes))
 
 	for i, userAndIconAndTheme := range userAndIconAndThemes {
-		if userAndIconAndTheme.ImageHash == "" {
+		if !userAndIconAndTheme.ImageHash.Valid {
 			image, err := os.ReadFile(fallbackImage)
 			if err != nil {
 				return nil, err
 			}
-			userAndIconAndTheme.ImageHash = fmt.Sprintf("%x", sha256.Sum256(image))
+			userAndIconAndTheme.ImageHash = sql.NullString{
+				String: fmt.Sprintf("%x", sha256.Sum256(image)),
+				Valid:  true,
+			}
 		}
 
 		users[i] = User{
@@ -496,7 +502,7 @@ func fillUsersResponse(ctx context.Context, tx *sqlx.Tx, userIDs []int64) ([]Use
 				ID:       userAndIconAndTheme.ID,
 				DarkMode: userAndIconAndTheme.DarkMode,
 			},
-			IconHash: userAndIconAndTheme.ImageHash,
+			IconHash: userAndIconAndTheme.ImageHash.String,
 		}
 	}
 

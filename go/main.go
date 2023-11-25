@@ -137,6 +137,17 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 
+	// iconsディレクトリの中身をすべて削除する
+	if err := os.RemoveAll("../icons"); err != nil {
+		c.Logger().Warnf("failed to remove icons directory with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	// iconsディレクトリを作成する
+	if err := os.Mkdir("../icons", 0755); err != nil {
+		c.Logger().Warnf("failed to create icons directory with err=%s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+
 	if err := isuutil.KickPproteinCollect(); err != nil {
 		c.Logger().Warnf("pprotein collect failed with err=%s", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
