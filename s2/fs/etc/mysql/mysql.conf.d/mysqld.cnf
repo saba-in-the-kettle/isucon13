@@ -33,7 +33,6 @@ mysqlx-bind-address	= 127.0.0.1
 #
 # * Fine Tuning
 #
-key_buffer_size		= 16M
 # max_allowed_packet	= 64M
 # thread_stack		= 256K
 
@@ -87,3 +86,25 @@ disable-log-bin
 slow_query_log=OFF
 long_query_time=0
 slow_query_log_file = /var/log/mysql/mysql-slow.log
+
+
+
+innodb_file_per_table=ON # InnoDBのデータ領域をテーブルごとに変える
+
+# innoDBの更新ログを保持するメモリ
+innodb_log_buffer_size = 16MB
+
+# InnoDBの更新ログを記録するディスク上のファイルサイズ(innodb_buffer_pool_sizeの4分の1程度)
+innodb_log_file_size=250MB
+
+# ORDER BYやGROUP BYのときに使われるメモリ上の領域
+innodb_sort_buffer_size = 4MB
+read_rnd_buffer_size = 2MB #
+key_buffer_size = 256MB # これも可能なら大きくした方が良い
+
+innodb_doublewrite = 0
+
+# [MySQL 8.0.22 で innodb_log_writer_threads の効果を見てみる - Qiita](https://qiita.com/hmatsu47/items/06489ef05bfcaaf310f3)
+# CPUコアが少ない場合はOFF
+innodb_log_writer_threads = off
+
